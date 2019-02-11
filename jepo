@@ -408,3 +408,48 @@ else
 fi
 echo ""
 
+echo "  ====> STEP 3: Running jepo hook scripts... <==="
+echo ""
+
+hook_dir="$working_dir/$jepo_dir/jepo.d"
+hook_scripts=()
+
+if [[ ! -d "$hook_dir" ]]; then
+  echo "jepo hook directory \"$hook_dir\" was not found."
+  echo "Existing jepo now without running hook scripts."
+  echo ""
+  exit 0
+fi
+
+# look for executable files in hook dir
+
+cd "$hook_dir"
+for file in *; do
+  if [[ -x "$file" ]]; then
+    hook_scripts=("${hook_scripts[@]}" "$file")
+  fi
+done
+cd "$working_dir"
+
+echo "Found ${#hook_scripts[@]} executable files in hook directory $hook_dir/:"
+if [[ "${#hook_scripts[@]}" == 0 ]]; then
+  echo "  (no files found, check permissions)"
+else
+  for file in "${hook_scripts[@]}"; do
+    echo "  $file"
+  done
+fi
+echo ""
+
+# loop through hook scripts
+num=0
+for file in "${hook_scripts[@]}"; do
+  num=$((num + 1))
+  echo "---> $((100 * $num / ${#hook_scripts[@]})) % ... running hook script $num/${#hook_scripts[@]}: $file"
+  echo ""
+  "$hook_dir/$file"
+  echo ""
+done
+
+# TODO: summary of failed scripts...
+

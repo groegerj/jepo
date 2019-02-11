@@ -212,6 +212,12 @@ for inc in "${includes[@]}"; do
 done
 echo "Found number of projects:"
 echo "  ${#projects[@]}"
+if [[ -d "$manifest_dir/jepo.d" ]]; then
+  echo "Found jepo hook directory:"
+  echo "  jepo.d/"
+else
+  echo "jepo hook directory \"jepo.d/\" was not found."
+fi
 
 echo ""
 echo "Change to directory $working_dir (working directory)."
@@ -219,12 +225,16 @@ cd "$working_dir"
 echo ""
 
 create_jepo_dir () {
-  echo "Creating directory \"$jepo_dir\" with files from the manifest directory:"
+  echo "Creating directory \"$jepo_dir\" with directories and files from the manifest directory:"
   mkdir "$jepo_dir"
   cd "$jepo_dir"
   echo "  jepo"
   cp "$0" jepo
   chmod 755 jepo
+  if [[ -d "$manifest_dir/jepo.d" ]]; then
+    echo "  jepo.d/"
+    cp -r "$manifest_dir/jepo.d" .
+  fi
   echo "  manifest.xml (from $manifest_file)"
   cp "$manifest_dir/$manifest_file" manifest.xml
   for inc in "${includes[@]}"; do

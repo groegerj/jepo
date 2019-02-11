@@ -1,0 +1,400 @@
+#!/bin/bash
+
+# jepo, a tool for synchronising git repositories
+#
+# Copyright (C) 2019 Josua Groeger.
+#
+# LICENSE
+#
+# jepo is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# jepo is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with jepo.  If not, see <http://www.gnu.org/licenses/>.
+
+working_dir=$(pwd)
+jepo_dir=".jepo"
+
+# call itself and append to log file
+if [[ "$1" != "--no-log-file" ]]; then
+  echo "Appending jepo stdout and stderr to log file:"
+  echo "  $working_dir/jepo.log"
+  echo ""
+  echo "" >> jepo.log
+  echo "==================================================" >> jepo.log
+  echo "  jepo call on $(date)" >> jepo.log
+  echo "==================================================" >> jepo.log
+  echo "" >> jepo.log
+  $0 --no-log-file $1 2>&1 | tee -a jepo.log
+  exit $?
+fi
+
+arg="$2"
+
+# initialise variables to store manifest contents
+initialise_variables () {
+  remotes=() # name tag
+  declare -Ag remotes_fetch
+  declare -Ag remotes_revision
+  declare -Ag remotes_review
+  
+  projects=() # name tag
+  declare -Ag projects_path
+  declare -Ag projects_remote
+  declare -Ag projects_cloneopts
+  declare -Ag projects_branch
+  
+  copys=() # dest tag
+  declare -Ag copys_src
+  declare -Ag copys_project
+  
+  links=() # dest tag
+  declare -Ag links_src
+  declare -Ag links_project
+  
+  includes=() # name tag
+}
+
+# parse manifest file, given as $1
+read_manifest_file () {
+  read_dom () {
+      local IFS=\>
+      read -d \< ENTITY CONTENT
+      local ret=$?
+      TAG_NAME=${ENTITY%% *}
+      ATTRIBUTES_SLASH=${ENTITY#* }
+      ATTRIBUTES=$(echo ${ATTRIBUTES_SLASH%/}| sed "s/sync-c/sync_c/"| sed "s/sync-j/sync_j/"| sed "s/clone-depth/clone_depth/")
+      if [[ "$CONTENT" == --\>* ]]; then # do not consider XML comments
+        TAG_NAME=""
+      fi
+      return $ret
+  }
+  
+  parse_dom () {
+      name=""
+      fetch=""
+      revision=""
+      review=""
+      path=""
+      remote=""
+      src=""
+      dest=""
+      clone_depth=""
+    if [[ "$TAG_NAME" == "remote" || $TAG_NAME == "default" ]]; then
+      eval local "$ATTRIBUTES"
+      if [[ "$TAG_NAME" == "default" ]]; then
+        name="default"
+        remotes_fetch["$name"]="$remote" # to be filled with real fetch from remote later
+      else
+        remotes_fetch["$name"]="$fetch"
+      fi
+      remotes=("${remotes[@]}" "$name")
+      remotes_revision["$name"]="$revision"
+      remotes_review["$name"]="$review"
+    elif [[ "$TAG_NAME" == "project" ]]; then
+      eval local "$ATTRIBUTES"
+      if [[ ! -z "$revision" ]]; then # there exist projects with same name but different branch...
+        name="$revision@$name"
+      fi
+      projects=("${projects[@]}" "$name")
+      projects_path["$name"]="$path"
+      projects_remote["$name"]="$remote"
+      projects_branch["$name"]="$revision"
+      if [[ ! -z "$clone_depth" ]]; then
+        projects_cloneopts["$name"]="--progress --depth $clone_depth"
+      else
+        projects_cloneopts["$name"]="--progress"
+      fi
+      current_project="$name"
+    elif [[ "$TAG_NAME" == "copyfile" ]]; then
+      eval local "$ATTRIBUTES"
+      copys=("${copys[@]}" "$dest")
+      copys_src["$dest"]="$src"
+      copys_project["$dest"]="$current_project"
+    elif [[ "$TAG_NAME" == "linkfile" ]]; then
+      eval local "$ATTRIBUTES"
+      links=("${links[@]}" "$dest")
+      links_src["$dest"]="$src"
+      links_project["$dest"]="$current_project"
+    elif [[ "$TAG_NAME" == "include" ]]; then
+      eval local "$ATTRIBUTES"
+      includes=("${includes[@]}" "$name")
+    fi
+  }
+  
+  while read_dom; do
+    parse_dom
+  done < "$1"
+}
+
+# fill "default" remote with data from its remote stored in "fetch"
+# to be called after the last call to read_manifest_file
+fill_default_remote () {
+  default_remote="${remotes_fetch[default]}"
+  remotes_fetch["default"]="${remotes_fetch[$default_remote]}"
+  if [[ -z "${remotes_revision[default]}" ]]; then
+    remotes_revision["default"]="${remotes_revision[$default_remote]}"
+  fi
+  if [[ -z "${remotes_review[default]}" ]]; then
+    remotes_review["default"]="${remotes_review[$default_remote]}"
+  fi
+}
+
+exit_help_manifest () {
+    echo ""
+    echo "Initialise jepo with a manifest file first:"
+    echo "  $0 manifest_file"
+    exit 1
+}
+
+echo "jepo tool called from working directory:"
+echo "  $working_dir"
+
+if [[ -z "$arg" ]]; then # no argument, expect to find stuff in $jepo_dir
+  echo "with no manifest file argument."
+  echo ""
+  if [[ ! -d "$jepo_dir" ]]; then # no $jepo_dir, exit
+    echo "Error: Sub-directory \"$jepo_dir\" of working directory does not exist."
+    exit_help_manifest
+  else # $jepo_dir, ok
+    echo "Sub-directory \"$jepo_dir\" of working directory found."
+    manifest_file="manifest.xml"
+    manifest_dir="$working_dir/$jepo_dir"
+    if [[ ! -f "$jepo_dir/$manifest_file" ]]; then
+      echo "Error: Manifest file \"$jepo_dir/$manifest_file\" not found."
+      exit_help_manifest
+    else
+      echo "Using manifest file \"$jepo_dir/$manifest_file\"."
+      echo ""
+    fi
+  fi
+else # argument exists, should be main manifest file
+  echo "with manifest file argument:"
+  echo "  $arg"
+  echo ""
+  if [[ ! -f "$arg" ]]; then
+    echo "Error: File does not exist."
+    exit 1
+  fi
+  manifest_file=$(basename "$arg")
+  manifest_dir=$(dirname "$arg")
+fi
+
+cd "$manifest_dir"
+echo "Change to manifest directory $manifest_dir."
+echo ""
+
+# parse manifest file, store contents in variables
+# depth-1 inclusion of manifest files
+initialise_variables
+read_manifest_file "$manifest_file"
+for inc in "${includes[@]}"; do
+  if [[ ! -f "$inc" ]]; then
+    echo "Error: File \"$inc\" to be included not found."
+    exit 1
+  else
+    read_manifest_file "$inc"
+  fi
+done
+fill_default_remote
+
+echo "Finish parsing manifest files:"
+echo "  $manifest_file"
+for inc in "${includes[@]}"; do
+  echo "  $inc"
+done
+echo "Found number of projects:"
+echo "  ${#projects[@]}"
+
+echo ""
+echo "Change to directory $working_dir (working directory)."
+cd "$working_dir"
+echo ""
+
+create_jepo_dir () {
+  echo "Creating directory \"$jepo_dir\" with files from the manifest directory:"
+  mkdir "$jepo_dir"
+  cd "$jepo_dir"
+  echo "  jepo"
+  cp "$0" jepo
+  chmod 755 jepo
+  echo "  manifest.xml (from $manifest_file)"
+  cp "$manifest_dir/$manifest_file" manifest.xml
+  for inc in "${includes[@]}"; do
+    echo "  $inc"
+    mkdir -p $(dirname "$inc")
+    cp "$manifest_dir"/"$inc" "$inc"
+  done
+  cd ..
+  echo "Creating a symbolic link $jepo_dir/jepo -> jepo."
+  [[ -f jepo ]] && rm jepo
+  ln -s "$jepo_dir"/jepo .
+}
+
+ask_proceed () {
+  echo "Do you want to proceed?"
+  echo -n "[y/N]: "
+  read YN
+  if [[ "$YN" != "y" ]]; then
+    echo "Apparently not, exiting."
+    exit 0
+  fi
+  echo ""
+}
+
+if [[ ! -z "$arg" ]]; then # manifest file argument given
+  if [[ ! -d "$jepo_dir" ]]; then # no jepo dir, copy stuff there
+    echo "Sub-directory \"$jepo_dir\" of working directory does not exist."
+    echo "About to create and populate it with the manifest files."
+    echo ""
+    ask_proceed
+    create_jepo_dir
+  else # jepo dir exists, overwrite?
+    echo "jepo was called with a manifest file argument."
+    echo "However, sub-directory \"$jepo_dir\" was found."
+    if [[ ! -f "$jepo_dir"/manifest.xml ]]; then
+      echo "  Info: File \"$jepo_dir/manifest.xml\" does not exist."
+    else 
+      diff_result=$(diff "$jepo_dir"/manifest.xml "$manifest_dir"/"$manifest_file")
+      if [[ "$diff_result" != "" ]]; then
+        echo "  Info: Files \"$jepo_dir/manifest.xml\" and \""$manifest_dir"/"$manifest_file"\" are different:"
+        echo "$diff_result"
+      else
+        echo "  Info: Files \"$jepo_dir/manifest.xml\" and \""$manifest_dir"/"$manifest_file"\" are identical."
+      fi
+    fi
+    echo "About to recreate \"$jepo_dir\" and populate it with the manifest files."
+    echo ""
+    ask_proceed
+    echo "Removing directory \"$jepo_dir\"."
+    rm -r "$jepo_dir"
+    create_jepo_dir
+  fi
+  echo ""
+fi
+
+echo "About to synchronise ${#projects[@]} projects."
+echo ""
+ask_proceed
+
+echo "  ====> STEP 1: Create directories and git clone/pull... <==="
+echo ""
+
+projects_git_failed=()
+declare -Ag projects_failure
+
+process_project () {
+  project="$1"
+  path="${projects_path[$project]}"
+  remote="${projects_remote[$project]}"
+  if [[ -z "$remote" ]]; then # no remote, use default
+    remote="default"
+  fi
+  fetch="${remotes_fetch[$remote]}"
+  revision="${remotes_revision[$remote]}"
+  branch="${revision##*/}" # initialise with remote branch, throw away refs/heads/ or refs/tags/
+  if [[ ! -z "${projects_branch[$project]}" ]]; then
+    branch="${projects_branch[$project]}"
+  fi
+  if [[ -z "$branch" ]]; then # add branch option if branch is specified
+    cloneopts="${projects_cloneopts[$project]}"
+    pullopts=""
+  else
+    cloneopts="--branch $branch ${projects_cloneopts[$project]}"
+    pullopts="$branch"
+  fi
+  project_short=${project##*@} # remove branch@
+
+  mkdir -vp "$path"
+  if [[ -d "$path"/.git ]]; then # is git repository
+    echo ".git directory found. Running"
+    echo "cd $path && git pull origin $pullopts"
+    echo ""
+    cd "$path"
+    git pull origin $pullopts
+    if [[ "$?" != 0 ]]; then
+      projects_git_failed=("${projects_git_failed[@]}" "$project")
+      projects_failure["$project"]="git pull ..."
+    fi
+    cd "$working_dir"
+  else # not a git repository
+    echo "No .git directory found. Running"
+    echo "git clone $cloneopts"
+    echo "  $fetch/$project_short $path"
+    echo ""
+    git clone $cloneopts $fetch/$project_short $path
+    if [[ "$?" != 0 ]]; then
+      projects_git_failed=("${projects_git_failed[@]}" "$project")
+      projects_failure["$project"]="git clone ..."
+    fi
+  fi
+  echo ""
+}
+
+# loop through projects
+num=0
+for p in "${projects[@]}";do
+  num=$((num + 1))
+  echo "---> $((100 * $num / ${#projects[@]})) % ... project $num/${#projects[@]}: $p -> ${projects_path[$p]}"
+  echo ""
+  process_project "$p"
+done
+
+echo "  ====> STEP 1: Summary... <==="
+echo ""
+
+if [[ "${#projects_git_failed[@]}" == 0 ]]; then
+  echo "All ${#projects[@]} projects were git cloned/pulled successfully."
+  echo ""
+else
+  echo "git reported errors on ${#projects_git_failed[@]}/${#projects[@]} projects:"
+  for p in "${projects_git_failed[@]}"; do
+    echo "  $p -> ${projects_path[$p]} (${projects_failure[$p]})"
+  done
+  echo ""
+  echo "Omitting STEP 2... fix errors and/or re-run script!"
+  exit 1
+fi
+
+echo "  ====> STEP 2: Copy and link files... <==="
+echo ""
+
+# loop through copys
+echo "Copying files..."
+if [[ "${#copys[@]}" == 0 ]]; then
+  echo "  (no files marked in manifest files)"
+else
+  for p in "${copys[@]}";do
+    dest="$p"
+    project="${copys_project[$p]}"
+    path="${projects_path[$project]}"
+    src="$path/${copys_src[$p]}"
+    echo "  cp $src $dest"
+    cp $src $dest
+  done
+fi
+echo ""
+
+# loop through links
+echo "Linking files..."
+if [[ "${#links[@]}" == 0 ]]; then
+  echo "  (no files marked in manifest files)"
+else
+  for p in "${links[@]}";do
+    dest="$p"
+    project="${links_project[$p]}"
+    path="${projects_path[$project]}"
+    src="$path/${links_src[$p]}"
+    echo "  ln -rsf $src $dest"
+    ln -rsf $src $dest
+  done
+fi
+echo ""
+

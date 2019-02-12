@@ -22,8 +22,79 @@
 working_dir=$(pwd)
 jepo_dir=".jepo"
 
+# define functions to be used in hook scripts
+if [[ "$1" == "--hook-defs" ]]; then
+
+  # delete and insert a PRODUCT_PACKAGES package in an mk file
+  _delete_insert_package () {
+    del_package="$1"
+    ins_package="$2"
+    insert="$3" # 0 for (delete and) insert, otherwise delete only
+    in_file="$4"
+    out_file="$5"
+  
+    lines=()
+    inside_pp_block=0
+    dels=0
+    ins=0
+    
+    if [[ "$insert" == 0 ]]; then
+      echo "Processing file \"$in_file\" (insert mode)..."
+    else
+      echo "Processing file \"$in_file\" (delete mode)..."
+    fi
+  
+    if [[ ! -f "$in_file" ]]; then
+      echo "  Error: File does not exist."
+      return 1
+    fi
+    
+    # insert one time ins_package and delete all occurrences of del_package
+    while IFS='' read -r line; do
+      if [[ "$inside_pp_block" == 1 && "$line" =~ "$del_package" ]]; then
+        ((dels++))
+      else
+        lines=("${lines[@]}" "$line")
+      fi
+    
+      if [[ "$insert" == 0 && "$line" =~ PRODUCT_PACKAGES.*+= ]]; then
+        ((ins++))
+        lines=("${lines[@]}" "    $ins_package \\")
+        insert=1
+      fi
+    
+      if [[ "$line" =~ PRODUCT_PACKAGES.*+= ]]; then
+        inside_pp_block=1
+      elif [[ ! "$line" =~ "\\" ]]; then
+        inside_pp_block=0
+      fi
+    done < "$in_file"
+    
+    echo "  $dels occurrence(s) of \"$del_package\" was/were deleted."
+    echo "  $ins occurrence(s) of \"$ins_package\" was/were inserted."
+  
+    # write to out_file
+    for line in "${lines[@]}";do
+      echo "$line"
+    done > "$out_file"
+  }
+  
+  delete_package () {
+    package="$1"
+    file="$2"
+    _delete_insert_package "$package" "$package" 1 "$file" "$file"
+  }
+  
+  insert_package () {
+    package="$1"
+    file="$2"
+    _delete_insert_package "$package" "$package" 0 "$file" "$file"
+  }
+
+  return 0
+
 # call itself and append to log file
-if [[ "$1" != "--no-log-file" ]]; then
+elif [[ "$1" != "--no-log-file" ]]; then
   echo "Appending jepo stdout and stderr to log file:"
   echo "  $working_dir/jepo.log"
   echo ""

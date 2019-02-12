@@ -433,7 +433,7 @@ cd "$working_dir"
 
 echo "Found ${#hook_scripts[@]} executable files in hook directory $hook_dir/:"
 if [[ "${#hook_scripts[@]}" == 0 ]]; then
-  echo "  (no files found, check permissions)"
+  echo "  (no executable files found)"
 else
   for file in "${hook_scripts[@]}"; do
     echo "  $file"
@@ -442,14 +442,39 @@ fi
 echo ""
 
 # loop through hook scripts
+hooks_failed=()
 num=0
 for file in "${hook_scripts[@]}"; do
   num=$((num + 1))
   echo "---> $((100 * $num / ${#hook_scripts[@]})) % ... running hook script $num/${#hook_scripts[@]}: $file"
   echo ""
   "$hook_dir/$file"
+  error="$?"
+  if [[ "$error" != 0 ]]; then
+    echo ""
+    echo "   ---> \"$file\" terminates with error code $error. <---"
+    hooks_failed=("${hooks_failed[@]}" "$file")
+  else
+    echo ""
+    echo "   ---> \"$file\" terminates successfully. <---"
+  fi
   echo ""
 done
 
-# TODO: summary of failed scripts...
+echo "  ====> STEP 3: Summary... <==="
+echo ""
+
+if [[ "${#hooks_failed[@]}" == 0 ]]; then
+  echo "All ${#hook_scripts[@]} hook scripts were run successfully."
+  echo ""
+else
+  echo "Errors were reported by ${#hooks_failed[@]}/${#hook_scripts[@]} hook scripts:"
+  for h in "${hooks_failed[@]}"; do
+    echo "  $h"
+  done
+  echo ""
+  echo "... fix errors and/or re-run script!"
+  echo ""
+  exit 1
+fi
 

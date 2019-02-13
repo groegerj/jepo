@@ -132,6 +132,18 @@ if [[ "$1" == "--hook-defs" ]]; then
     _jhookpriv_cp_directory "$jepo_dir/hook-src/$dir" "$dir"
   }
 
+  jhook_add_package () {
+    package="$1"
+    subdir="$2"
+    mkfile="$3"
+    jhook_copy_directory "$subdir/$package"
+    ret1="$?"
+    jhook_insert_package "$package" "$mkfile"
+    ret2="$?"
+    (( ret = $ret1 || $ret2 ))
+    return $ret
+  }
+
   return 0
 
 # call itself and append to log file

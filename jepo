@@ -289,6 +289,12 @@ if [[ -d "$manifest_dir/jepo.d" ]]; then
 else
   echo "jepo hook directory \"jepo.d/\" was not found."
 fi
+if [[ -d "$manifest_dir/hook-src" ]]; then
+  echo "Found hook source directory:"
+  echo "  hook-src/"
+else
+  echo "hook source directory \"hook-src/\" was not found."
+fi
 
 echo ""
 echo "Change to directory $working_dir (working directory)."
@@ -305,6 +311,10 @@ create_jepo_dir () {
   if [[ -d "$manifest_dir/jepo.d" ]]; then
     echo "  jepo.d/"
     cp -r "$manifest_dir/jepo.d" .
+  fi
+  if [[ -d "$manifest_dir/hook-src" ]]; then
+    echo "  hook-src/"
+    cp -r "$manifest_dir/hook-src" .
   fi
   echo "  manifest.xml (from $manifest_file)"
   cp "$manifest_dir/$manifest_file" manifest.xml

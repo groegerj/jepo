@@ -26,7 +26,7 @@ jepo_dir=".jepo"
 if [[ "$1" == "--hook-defs" ]]; then
 
   # remove and insert a PRODUCT_PACKAGES package in an mk file
-  _jhookpriv_remove_insert_package () {
+  _jhookpriv_package_remove_insert () {
     del_package="$1"
     ins_package="$2"
     insert="$3" # 0 for (remove and) insert, otherwise remove only
@@ -81,7 +81,7 @@ if [[ "$1" == "--hook-defs" ]]; then
   }
 
   # copy from to, relative to the working directory
-  _jhookpriv_copy () {
+  _jhookpriv_file_copy () {
     from="$1"
     to="$2"
     echo "Copying (overwriting) \"$from\" to \"$to\"..."
@@ -120,29 +120,30 @@ if [[ "$1" == "--hook-defs" ]]; then
     return "$error"
   }
 
-  jhook_remove_package () {
+  jhook_package_remove () {
     package="$1"
     file="$2"
-    _jhookpriv_remove_insert_package "$package" "$package" 1 "$file" "$file"
+    _jhookpriv_package_remove_insert "$package" "$package" 1 "$file" "$file"
   }
   
-  jhook_insert_package () {
+  jhook_package_insert () {
     package="$1"
     file="$2"
-    _jhookpriv_remove_insert_package "$package" "$package" 0 "$file" "$file"
+    _jhookpriv_package_remove_insert "$package" "$package" 0 "$file" "$file"
   }
 
-  jhook_copy () {
-    _jhookpriv_copy "$jepo_dir/hook-src/$1" "$2"
+  # 'file' can be a regular file, directory or a link to either
+  jhook_file_copy () {
+    _jhookpriv_file_copy "$jepo_dir/hook-src/$1" "$2"
   }
 
-  jhook_add_package () {
+  jhook_package_add () {
     package="$1"
     subdir="$2"
     mkfile="$3"
-    jhook_copy "$package" "$subdir/$package"
+    jhook_file_copy "$package" "$subdir/$package"
     ret1="$?"
-    jhook_insert_package "$package" "$mkfile"
+    jhook_package_insert "$package" "$mkfile"
     ret2="$?"
     (( ret = $ret1 || $ret2 ))
     return $ret

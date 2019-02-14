@@ -128,15 +128,14 @@ if [[ "$1" == "--hook-defs" ]]; then
   }
 
   jhook_copy_directory () {
-    dir="$1"
-    _jhookpriv_cp_directory "$jepo_dir/hook-src/$dir" "$dir"
+    _jhookpriv_cp_directory "$jepo_dir/hook-src/$1" "$2"
   }
 
   jhook_add_package () {
     package="$1"
     subdir="$2"
     mkfile="$3"
-    jhook_copy_directory "$subdir/$package"
+    jhook_copy_directory "$package" "$subdir/$package"
     ret1="$?"
     jhook_insert_package "$package" "$mkfile"
     ret2="$?"

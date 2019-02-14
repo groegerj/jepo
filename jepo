@@ -81,29 +81,32 @@ if [[ "$1" == "--hook-defs" ]]; then
   }
 
   # copy from to, relative to the working directory
-  _jhookpriv_cp_directory () {
+  _jhookpriv_copy () {
     from="$1"
     to="$2"
     echo "Copying (overwriting) \"$from\" to \"$to\"..."
-    if [[ ! -d "$from" ]]; then
-      echo "  Error: Source directory does not exist."
+    if [[ ! -e "$from" ]]; then
+      echo "  Error: Source file or directory does not exist."
       return 1
     fi
-  
-    rm -r "$to"
-    error="$?"
-    if [[ "$error" == 0 ]]; then
-      echo "  rm -r terminates successfully."
-    else
-      echo "  rm -r terminates with error code $error"
-    fi
-  
-    mkdir -p "$to"
-    error="$?"
-    if [[ "$error" == 0 ]]; then
-      echo "  mkdir -p terminates successfully."
-    else
-      echo "  mkdir -p terminates with error code $error"
+
+    # case directory
+    if [[ -d "$from" ]]; then
+      rm -r "$to"
+      error="$?"
+      if [[ "$error" == 0 ]]; then
+        echo "  rm -r terminates successfully."
+      else
+        echo "  rm -r terminates with error code $error"
+      fi
+    
+      mkdir -p "$to"
+      error="$?"
+      if [[ "$error" == 0 ]]; then
+        echo "  mkdir -p terminates successfully."
+      else
+        echo "  mkdir -p terminates with error code $error"
+      fi
     fi
 
     cp -rTH "$from" "$to"
@@ -129,15 +132,15 @@ if [[ "$1" == "--hook-defs" ]]; then
     _jhookpriv_remove_insert_package "$package" "$package" 0 "$file" "$file"
   }
 
-  jhook_copy_directory () {
-    _jhookpriv_cp_directory "$jepo_dir/hook-src/$1" "$2"
+  jhook_copy () {
+    _jhookpriv_copy "$jepo_dir/hook-src/$1" "$2"
   }
 
   jhook_add_package () {
     package="$1"
     subdir="$2"
     mkfile="$3"
-    jhook_copy_directory "$package" "$subdir/$package"
+    jhook_copy "$package" "$subdir/$package"
     ret1="$?"
     jhook_insert_package "$package" "$mkfile"
     ret2="$?"

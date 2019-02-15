@@ -136,8 +136,8 @@ if [[ "$1" == "--hook-defs" ]]; then
     _jhookpriv_file_copy "$jepo_dir/hook-src/$1" "$2"
   }
 
-  # append line to file if argument does not exist, otherwise replace
-  jhook_file_argument () {
+  # append line to config file if argument does not exist, otherwise replace
+  jhook_conf_argument () {
     file="$1"
     argument="$2"
     line="$3"

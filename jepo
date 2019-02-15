@@ -116,7 +116,6 @@ if [[ "$1" == "--hook-defs" ]]; then
     else
       echo "  cp -rTH terminates with error code $error"
     fi
-    echo ""
     return "$error"
   }
 
@@ -147,16 +146,16 @@ if [[ "$1" == "--hook-defs" ]]; then
       numlines=$(grep -c "$argument" "$file")
       if [[ "$numlines" -ne 0 ]]; then
         oldline=$(grep "$argument" "$file")
-        echo "  Removing the following line in $file:"
-        echo "    $oldline"
+        echo "Removing the following line in $file:"
+        echo "  $oldline"
         sed -i "/^$argument/d" "$file"
       fi
     else
       mkdir -p $(dirname "$file")
     fi
   
-    echo "  Appending the following line to $file:"
-    echo "    $line"
+    echo "Appending the following line to $file:"
+    echo "  $line"
     echo "$line" >> "$file"
   }
 

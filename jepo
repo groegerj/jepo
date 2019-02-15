@@ -137,6 +137,29 @@ if [[ "$1" == "--hook-defs" ]]; then
     _jhookpriv_file_copy "$jepo_dir/hook-src/$1" "$2"
   }
 
+  # append line to file if argument does not exist, otherwise replace
+  jhook_file_argument () {
+    file="$1"
+    argument="$2"
+    line="$3"
+  
+    if [[ -f "$file" ]]; then
+      numlines=$(grep -c "$argument" "$file")
+      if [[ "$numlines" -ne 0 ]]; then
+        oldline=$(grep "$argument" "$file")
+        echo "  Removing the following line in $file:"
+        echo "    $oldline"
+        sed -i "/^$argument/d" "$file"
+      fi
+    else
+      mkdir -p $(dirname "$file")
+    fi
+  
+    echo "  Appending the following line to $file:"
+    echo "    $line"
+    echo "$line" >> "$file"
+  }
+
   jhook_package_add () {
     package="$1"
     subdir="$2"

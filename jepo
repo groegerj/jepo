@@ -25,13 +25,14 @@ jepo_dir=".jepo"
 # define functions to be used in hook scripts
 if [[ "$1" == "--hook-defs" ]]; then
 
-  # remove and insert a PRODUCT_PACKAGES package in an mk file
-  _jhookpriv_package_remove_insert () {
-    del_package="$1"
-    ins_package="$2"
-    insert="$3" # 0 for (remove and) insert, otherwise remove only
-    in_file="$4"
-    out_file="$5"
+  # remove and insert a PROPERTY entry in an mk file
+  _jhookpriv_property_remove_insert () {
+    property="$1"
+    del_entry="$2"
+    ins_entry="$3"
+    insert="$4" # 0 for (remove and) insert, otherwise remove only
+    in_file="$5"
+    out_file="$6"
   
     lines=()
     inside_pp_block=0
@@ -49,29 +50,29 @@ if [[ "$1" == "--hook-defs" ]]; then
       return 1
     fi
     
-    # insert one time ins_package and remove all occurrences of del_package
+    # insert one time ins_entry and remove all occurrences of del_entry
     while IFS='' read -r line; do
-      if [[ "$inside_pp_block" == 1 && "$line" =~ "$del_package" ]]; then
+      if [[ "$inside_pp_block" == 1 && "$line" =~ "$del_entry" ]]; then
         ((dels++))
       else
         lines=("${lines[@]}" "$line")
       fi
     
-      if [[ "$insert" == 0 && "$line" =~ PRODUCT_PACKAGES.*+= ]]; then
+      if [[ "$insert" == 0 && "$line" =~ $property.*+= ]]; then
         ((ins++))
-        lines=("${lines[@]}" "    $ins_package \\")
+        lines=("${lines[@]}" "    $ins_entry \\")
         insert=1
       fi
     
-      if [[ "$line" =~ PRODUCT_PACKAGES.*+= ]]; then
+      if [[ "$line" =~ $property.*+= ]]; then
         inside_pp_block=1
       elif [[ ! "$line" =~ "\\" ]]; then
         inside_pp_block=0
       fi
     done < "$in_file"
     
-    echo "  $dels occurrence(s) of \"$del_package\" was/were removed."
-    echo "  $ins occurrence(s) of \"$ins_package\" was/were inserted."
+    echo "  $dels occurrence(s) of \"$del_entry\" was/were removed."
+    echo "  $ins occurrence(s) of \"$ins_entry\" was/were inserted."
     echo ""
   
     # write to out_file
@@ -122,13 +123,13 @@ if [[ "$1" == "--hook-defs" ]]; then
   jhook_package_remove () {
     package="$1"
     file="$2"
-    _jhookpriv_package_remove_insert "$package" "$package" 1 "$file" "$file"
+    _jhookpriv_property_remove_insert "PRODUCT_PACKAGES" "$package" "$package" 1 "$file" "$file"
   }
   
   jhook_package_insert () {
     package="$1"
     file="$2"
-    _jhookpriv_package_remove_insert "$package" "$package" 0 "$file" "$file"
+    _jhookpriv_property_remove_insert "PRODUCT_PACKAGES" "$package" "$package" 0 "$file" "$file"
   }
 
   # 'file' can be a regular file, directory or a link to either

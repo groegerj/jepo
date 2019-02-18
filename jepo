@@ -132,6 +132,18 @@ if [[ "$1" == "--hook-defs" ]]; then
     _jhookpriv_property_remove_insert "PRODUCT_PACKAGES" "$package" "$package" 0 "$file" "$file"
   }
 
+  jhook_property_override_remove () {
+    override="$1"
+    file="$2"
+    _jhookpriv_property_remove_insert "PRODUCT_PROPERTY_OVERRIDES" "$override" "$override" 1 "$file" "$file"
+  }
+  
+  jhook_property_override_insert () {
+    override="$1"
+    file="$2"
+    _jhookpriv_property_remove_insert "PRODUCT_PROPERTY_OVERRIDES" "$override" "$override" 0 "$file" "$file"
+  }
+
   # 'file' can be a regular file, directory or a link to either
   jhook_file_copy () {
     _jhookpriv_file_copy "$jepo_dir/hook-src/$1" "$2"

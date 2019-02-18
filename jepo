@@ -375,6 +375,13 @@ if [[ -d "$manifest_dir/hook-src" ]]; then
 else
   echo "hook source directory \"hook-src/\" was not found."
 fi
+if [[ -x "$manifest_dir/envsetup" ]]; then
+  echo "Found \"envsetup\" executable:"
+  echo "  envsetup"
+else
+  echo "\"envsetup\" executable was not found."
+fi
+
 
 echo ""
 echo "Change to directory $working_dir (working directory)."
@@ -396,6 +403,10 @@ create_jepo_dir () {
     echo "  hook-src/"
     cp -r "$manifest_dir/hook-src" .
   fi
+  if [[ -x "$manifest_dir/envsetup" ]]; then
+    echo "  envsetup"
+    cp "$manifest_dir/envsetup" .
+  fi
   echo "  manifest.xml (from $manifest_file)"
   cp "$manifest_dir/$manifest_file" manifest.xml
   for inc in "${includes[@]}"; do
@@ -407,6 +418,11 @@ create_jepo_dir () {
   echo "Creating a symbolic link $jepo_dir/jepo -> jepo."
   [[ -f jepo ]] && rm jepo
   ln -s "$jepo_dir"/jepo .
+  [[ -f envsetup ]] && rm envsetup
+  if [[ -f "$jepo_dir"/envsetup ]]; then
+    echo "Creating a symbolic link $jepo_dir/envsetup -> envsetup."
+    ln -s "$jepo_dir"/envsetup .
+  fi
 }
 
 ask_proceed () {

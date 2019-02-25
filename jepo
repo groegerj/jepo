@@ -498,11 +498,12 @@ process_project () {
     remote="default"
   fi
   fetch="${remotes_fetch[$remote]}"
-  revision="${remotes_revision[$remote]}"
-  branch="${revision##*/}" # initialise with remote branch, throw away refs/heads/ or refs/tags/
   if [[ ! -z "${projects_branch[$project]}" ]]; then
-    branch="${projects_branch[$project]}"
+    revision="${projects_branch[$project]}"
+  else
+    revision="${remotes_revision[$remote]}"
   fi
+  branch="${revision##*/}" # throw away refs/heads/ or refs/tags/
   if [[ -z "$branch" ]]; then # add branch option if branch is specified
     cloneopts="${projects_cloneopts[$project]}"
     pullopts=""

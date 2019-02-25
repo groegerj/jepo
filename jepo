@@ -93,12 +93,12 @@ if [[ "$1" == "--hook-defs" ]]; then
 
     # case directory
     if [[ -d "$from" ]]; then
-      rm -r "$to"
+      rm -rf "$to"
       error="$?"
       if [[ "$error" == 0 ]]; then
-        echo "  rm -r terminates successfully."
+        echo "  rm -rf terminates successfully."
       else
-        echo "  rm -r terminates with error code $error"
+        echo "  rm -rf terminates with error code $error"
       fi
     
       mkdir -p "$to"

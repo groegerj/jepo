@@ -504,7 +504,11 @@ process_project () {
     revision="${remotes_revision[$remote]}"
   fi
   branch="${revision##*/}" # throw away refs/heads/ or refs/tags/
-  if [[ -z "$branch" ]]; then # add branch option if branch is specified
+  is_commit=0
+  if [[ "$branch" =~ ^[a-f0-9]{40}$ ]]; then # branch (revision in fact) is (an sha-1) commit
+    is_commit=1
+  fi
+  if [[ -z "$branch" || "$is_commit" == 1 ]]; then
     cloneopts="${projects_cloneopts[$project]}"
     pullopts=""
   else
@@ -516,11 +520,20 @@ process_project () {
   mkdir -vp "$path"
   if [[ -d "$path"/.git ]]; then # is git repository
     echo ".git directory found. Running"
-    echo "cd $path && git pull origin $pullopts"
+    if [[ "$is_commit" == 1 ]]; then
+      echo "cd $path && git checkout master && git pull origin $pullopts"
+    else
+      echo "cd $path && git pull origin $pullopts"
+    fi
     echo ""
     cd "$path"
-    git pull origin $pullopts
-    if [[ "$?" != 0 ]]; then
+    if [[ "$is_commit" == 1 ]]; then
+      git checkout master && git pull origin $pullopts
+    else
+      git pull origin $pullopts
+    fi
+    exitcode="$?"
+    if [[ "$exitcode" != 0 ]]; then
       projects_git_failed=("${projects_git_failed[@]}" "$project")
       projects_failure["$project"]="git pull ..."
     fi
@@ -531,12 +544,24 @@ process_project () {
     echo "  $fetch/$project_short $path"
     echo ""
     git clone $cloneopts $fetch/$project_short $path
-    if [[ "$?" != 0 ]]; then
+    exitcode="$?"
+    if [[ "$exitcode" != 0 ]]; then
       projects_git_failed=("${projects_git_failed[@]}" "$project")
       projects_failure["$project"]="git clone ..."
     fi
   fi
   echo ""
+  if [[ "$exitcode" == 0 && "$is_commit" == 1 ]]; then # previous git command was successful and branch is commit
+    echo "git checkout $branch"
+    cd "$path"
+    git checkout "$branch"
+    if [[ "$?" != 0 ]]; then
+      projects_git_failed=("${projects_git_failed[@]}" "$project")
+      projects_failure["$project"]="git checkout ..."
+    fi
+    cd "$working_dir"
+    echo ""
+  fi
 }
 
 # loop through projects

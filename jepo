@@ -618,8 +618,8 @@ else
     project="${links_project[$p]}"
     path="${projects_path[$project]}"
     src="$path/${links_src[$p]}"
-    echo "  ln -rsf $src $dest"
-    ln -rsf $src $dest
+    echo "  ln -rsfT $src $dest"
+    ln -rsfT $src $dest
   done
 fi
 echo ""

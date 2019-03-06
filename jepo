@@ -504,34 +504,24 @@ process_project () {
     revision="${remotes_revision[$remote]}"
   fi
   branch="${revision##*/}" # throw away refs/heads/ or refs/tags/
-  is_commit=0
-  if [[ "$branch" =~ ^[a-f0-9]{40}$ ]]; then # branch (revision in fact) is (an sha-1) commit
-    is_commit=1
+  commit=""
+  if [[ -z "$branch" ]]; then
+    branch="master"
+  elif [[ "$branch" =~ ^[a-f0-9]{40}$ ]]; then # branch (revision in fact) is (an sha-1) commit
+    commit="$branch"
+    branch="master"
   fi
-  if [[ -z "$branch" || "$is_commit" == 1 ]]; then
-    cloneopts="${projects_cloneopts[$project]}"
-    pullopts=""
-  else
-    cloneopts="--branch $branch ${projects_cloneopts[$project]}"
-    pullopts="$branch"
-  fi
+
+  cloneopts="--branch $branch ${projects_cloneopts[$project]}"
   project_short=${project##*@} # remove branch@
 
   mkdir -vp "$path"
   if [[ -d "$path"/.git ]]; then # is git repository
     echo ".git directory found. Running"
-    if [[ "$is_commit" == 1 ]]; then
-      echo "cd $path && git checkout master && git pull origin $pullopts"
-    else
-      echo "cd $path && git pull origin $pullopts"
-    fi
+    echo "cd $path && git checkout $branch && git pull origin $branch"
     echo ""
     cd "$path"
-    if [[ "$is_commit" == 1 ]]; then
-      git checkout master && git pull origin $pullopts
-    else
-      git pull origin $pullopts
-    fi
+    git checkout "$branch" && git pull origin "$branch"
     exitcode="$?"
     if [[ "$exitcode" != 0 ]]; then
       projects_git_failed=("${projects_git_failed[@]}" "$project")
@@ -551,10 +541,11 @@ process_project () {
     fi
   fi
   echo ""
-  if [[ "$exitcode" == 0 && "$is_commit" == 1 ]]; then # previous git command was successful and branch is commit
-    echo "git checkout $branch"
+
+  if [[ "$exitcode" == 0 && ! -z "$commit" ]]; then # previous git command was successful and branch is commit
+    echo "git checkout $commit"
     cd "$path"
-    git checkout "$branch"
+    git checkout "$commit"
     if [[ "$?" != 0 ]]; then
       projects_git_failed=("${projects_git_failed[@]}" "$project")
       projects_failure["$project"]="git checkout ..."

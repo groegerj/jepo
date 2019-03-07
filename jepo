@@ -498,12 +498,17 @@ process_project () {
     remote="default"
   fi
   fetch="${remotes_fetch[$remote]}"
-  if [[ ! -z "${projects_branch[$project]}" ]]; then
-    revision="${projects_branch[$project]}"
+
+  revision_project="${projects_branch[$project]}"
+  revision_project="${revision_project##*/}" # throw away refs/heads/ or refs/tags/
+  revision_remote="${remotes_revision[$remote]}"
+  revision_remote="${revision_remote##*/}" # throw away refs/heads/ or refs/tags/
+
+  if [[ ! -z "$revision_project" ]]; then
+    revision="$revision_project"
   else
-    revision="${remotes_revision[$remote]}"
+    revision="$revision_remote"
   fi
-  revision="${revision##*/}" # throw away refs/heads/ or refs/tags/
 
   commit=""
   branch=""
@@ -512,7 +517,7 @@ process_project () {
     branch="${revision##*:}"
   elif [[ "$revision" =~ ^[a-f0-9]{40}$ ]]; then # revision is (an sha-1) commit, no colon delimiter
     commit="$revision"
-    branch="${remotes_revision[$remote]}"
+    branch="$revision_remote"
   else # revision is a branch, no colon delimiter
     branch="$revision"
   fi

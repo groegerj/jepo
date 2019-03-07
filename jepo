@@ -503,13 +503,20 @@ process_project () {
   else
     revision="${remotes_revision[$remote]}"
   fi
-  branch="${revision##*/}" # throw away refs/heads/ or refs/tags/
-  commit=""
-  if [[ -z "$branch" ]]; then
+  revision="${revision##*/}" # throw away refs/heads/ or refs/tags/
+
+  if [[ -z "$revision" ]]; then # empty revision
+    commit=""
     branch="master"
-  elif [[ "$branch" =~ ^[a-f0-9]{40}$ ]]; then # branch (revision in fact) is (an sha-1) commit
-    commit="$branch"
+  elif [[ "$revision" =~ .*:.* ]]; then # revision contains a colon delimiter, commit = first part, branch = second part
+    commit="${revision%%:*}"
+    branch="${revision##*:}"
+  elif [[ "$revision" =~ ^[a-f0-9]{40}$ ]]; then # revision is (an sha-1) commit, no colon delimiter
+    commit="$revision"
     branch="master"
+  else # revision is a branch, no colon delimiter
+    commit=""
+    branch="$revision"
   fi
 
   cloneopts="--branch $branch ${projects_cloneopts[$project]}"
